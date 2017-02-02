@@ -9,6 +9,9 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "q": "^1.4.1",
+    "request": "^2.79.0",
+    "request-promise": "^4.1.1",
     "x-ray": "^2.3.1"
   }
 }

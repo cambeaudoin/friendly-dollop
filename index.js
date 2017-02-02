@@ -1,7 +1,8 @@
-var Xray = require('x-ray');
-var x = Xray();
-var fs = require('fs');
-var http = require('http');
+const Xray = require('x-ray')();
+const fs = require('fs');
+const request = require('request');
+const requestPromise = require('request-promise');
+const Q = require('q');
 
 // array of sites to test
 const resultsArray = [];
@@ -9,47 +10,71 @@ const resultsArray = [];
 // fs file to write to
 const fileDest = "results.txt";
 
-// selector to isolate
-const selector = x(
-    '.rankTable .wsTR', [{
-        result: ['td']
-    }]
-);
-
-const writeFile = function (data) {
+const writeFile = function (fileDest, data) {
     fs.writeFile(fileDest, JSON.stringify(data), function (err) {
         if (err) {
             return console.log(err);
         }
         console.log("The file was saved!");
     });
-}
+};
+
 const run = function () {
-    for (var i = 1; i < 44; i++) {
+    for (var i = 1; i < 2; i++) {
         // site you want to scrape
-        var site = 'https://domaintyper.com/top-websites/most-popular-websites-with-ca-domain/page/' + i;
+        const site = 'https://domaintyper.com/top-websites/most-popular-websites-with-ca-domain/page/' + i;
 
-        x(site, selector)(function (err, data) {
-            data.forEach(function (p) {
-                // console.log(p.result[1]);
-                resultsArray.push(p.result[1]);
-                var req = http.request({host: p.result[1]}, function (res) {
-                    res.on('data', function (chunk) {
+        // selector to isolate table values
+        const selector = Xray(
+            '.rankTable .wsTR', [{
+                result: ['td']
+            }]
+        );
 
-var potato = JSON.stringify(chunk);
-var firstLine = potato.substr(0, potato.indexOf("\n"));
+        Xray(site, selector)(function (err, data) {
+            var websitesPromises = [];
 
 
-                        console.log({theSite: p.result[1], head: potato});
-                    });
-                });
-                req.on('error', function (e) {
-                    console.log('problem with request: ' + e.message);
-                });
+            for (var i = 0; i < 20; i++) {
+              console.log("i: ", i);
 
-                req.end();
-            })
-        })
+              const tr = data[i];
+              const urlHttp = `http://www.${tr.result[1]}`;
+              const urlHttps = `https://www.${tr.result[1]}`;
+
+              const optionsHttp = {
+                  uri: urlHttp,
+                  json: true
+              };
+
+              const optionsHttps = {
+                  uri: urlHttps,
+                  json: true
+              };
+
+              websitesPromises.push(
+                requestPromise(optionsHttp).then(function(ret) {
+                  console.log("HTTP: ", optionsHttp.uri);
+                  return ret;
+                }).catch(function(err) {
+                  console.log('ERR: statusCode: ', err.statusCode , " - ", optionsHttp.uri);
+
+                  return requestPromise(optionsHttps).then(function(ret) {
+                    console.log("HTTPS: ", optionsHttps.uri);
+                  }).catch(function(err) {
+                    console.log('ERR: statusCode: ', err.statusCode , " - ", optionsHttps.uri);
+                  });
+
+                })
+              );
+
+            };
+
+            Q.all(websitesPromises).then(function(websites) {
+              console.log("Websites: ", websites);
+            });
+
+        });
     }
 }
 
